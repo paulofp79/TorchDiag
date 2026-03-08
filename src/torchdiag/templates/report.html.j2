@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TorchDiag Report</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.2.min.js"></script>
+    <style>
+      body {
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        margin: 24px;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .section {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 18px;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+      }
+      h1 {
+        margin: 0 0 12px 0;
+        font-size: 28px;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="section">
+      <h1>TorchDiag Report — {{ metadata.job_name }}</h1>
+      <p class="tag">Start: {{ metadata.start_time }}</p>
+      <p class="tag">End: {{ metadata.end_time }}</p>
+    </div>
+
+    <div class="section">
+      <h2>Executive Summary</h2>
+      <ul>
+        <li>Avg step time: {{ summary.avg_step_ms }}</li>
+        <li>Throughput: {{ summary.throughput }}</li>
+        <li>Avg GPU util: {{ summary.avg_gpu_util }}</li>
+        <li>Dataloader wait share: {{ summary.dataloader_wait_share }}</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Environment</h2>
+      <table>
+        <tr><th>Python</th><td>{{ metadata.python_version }}</td></tr>
+        <tr><th>PyTorch</th><td>{{ metadata.torch_version }}</td></tr>
+        <tr><th>CUDA</th><td>{{ metadata.cuda_available }}</td></tr>
+        <tr><th>Device</th><td>{{ metadata.cuda_device_name | default('n/a') }}</td></tr>
+        <tr><th>Host</th><td>{{ metadata.hostname }}</td></tr>
+        <tr><th>Platform</th><td>{{ metadata.platform }}</td></tr>
+        <tr><th>PID</th><td>{{ metadata.pid }}</td></tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Timeline Charts</h2>
+      <div id="step-chart"></div>
+      <div id="util-chart"></div>
+      <div id="mem-chart"></div>
+    </div>
+
+    <div class="section">
+      <h2>Event Breakdown</h2>
+      <div id="event-chart"></div>
+      <ul>
+        {% for key, value in event_breakdown.items() %}
+        <li>{{ key }}: {{ value }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Findings & Recommendations</h2>
+      {% if findings %}
+        {% for finding in findings %}
+          <h3>{{ finding.issue_type }} ({{ finding.severity }})</h3>
+          <p><strong>Confidence:</strong> {{ finding.confidence }}</p>
+          <p><strong>Evidence:</strong> {{ finding.evidence }}</p>
+          <ul>
+            {% for rec in finding.recommendations %}
+            <li>{{ rec }}</li>
+            {% endfor %}
+          </ul>
+        {% endfor %}
+      {% else %}
+        <p>No findings detected.</p>
+      {% endif %}
+    </div>
+
+    <div class="section">
+      <h2>Slowest Steps</h2>
+      <table>
+        <tr><th>Step</th><th>Duration (ms)</th><th>Batch Size</th></tr>
+        {% for step in slowest_steps %}
+          <tr>
+            <td>{{ step.step }}</td>
+            <td>{{ step.duration_ms }}</td>
+            <td>{{ step.batch_size | default('n/a') }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    {% if comparison %}
+    <div class="section">
+      <h2>Run Comparison</h2>
+      <table>
+        <tr><th>Metric</th><th>Run A</th><th>Run B</th><th>Delta</th><th>Delta %</th></tr>
+        {% for metric in comparison.metrics %}
+          <tr>
+            <td>{{ metric.name }}</td>
+            <td>{{ metric.run_a | default('n/a') }}</td>
+            <td>{{ metric.run_b | default('n/a') }}</td>
+            <td>{{ metric.delta | default('n/a') }}</td>
+            <td>{{ metric.delta_pct | default('n/a') }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+      <h3>Diagnosis Differences</h3>
+      <p>Only in A: {{ comparison.diagnosis_diff.only_in_a }}</p>
+      <p>Only in B: {{ comparison.diagnosis_diff.only_in_b }}</p>
+      <p>Shared: {{ comparison.diagnosis_diff.shared }}</p>
+    </div>
+    {% endif %}
+
+    <script>
+      const stepFig = {{ step_chart | safe }};
+      Plotly.newPlot("step-chart", stepFig.data, stepFig.layout);
+      const utilFig = {{ util_chart | safe }};
+      Plotly.newPlot("util-chart", utilFig.data, utilFig.layout);
+      const memFig = {{ mem_chart | safe }};
+      Plotly.newPlot("mem-chart", memFig.data, memFig.layout);
+      const eventFig = {{ event_chart | safe }};
+      Plotly.newPlot("event-chart", eventFig.data, eventFig.layout);
+    </script>
+  </body>
+</html>
